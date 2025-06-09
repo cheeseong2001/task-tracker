@@ -13,3 +13,6 @@ class Task(TaskCreate):
 class StatusUpdate(BaseModel):
     new_status: enums.StatusEnum
 
+class TaskEdit(BaseModel, extra="forbid"):
+    task_name: str | None = None
+    description: str | None = None

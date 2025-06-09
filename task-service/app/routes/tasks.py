@@ -61,17 +61,29 @@ def update_status(task_id: int, status_update: StatusUpdate) -> Task:
         task_dict = dict(zip(columns, row))
         return Task(**task_dict)
 
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE tasks SET status = %s WHERE id = %s RETURNING *", (status_update.new_status, task_id))
-    row = cursor.fetchone()
-    if row is None:
-        raise HTTPException(404, f"Task with id {task_id} not found")
+@router.patch("/tasks/{task_id}/edit")
+def edit_task(task_id: int, task_update: TaskEdit) -> Task:
+    with db.get_db_cursor() as cursor:
+        data = task_update.model_dump(exclude_unset=True)
+        if data == {}:
+            raise HTTPException(400, "No fields provided for update")
+        
+        columns = [sql.Identifier(k) for k in data.keys()]
+        placeholders = [sql.Placeholder() for _ in data]
+        assignments = [sql.SQL("{} = {}").format(col, ph) for col, ph in zip(columns, placeholders)]
+
+        query = sql.SQL("UPDATE tasks SET {assignments} WHERE id = %s RETURNING *").format(
+            assignments=sql.SQL(", ").join(assignments)
+        )
+
+        cursor.execute(query, list(data.values()) + [task_id])
+        row = cursor.fetchone()
+
+        if row is None:
+            raise HTTPException(404, f"Task with id {task_id} not found")
+
+        columns = [desc[0] for desc in cursor.description] # type: ignore
+        task_dict = dict(zip(columns, row))
+
+        return Task(**task_dict)
     
-    columns = [desc[0] for desc in cursor.description] # type: ignore
-    task_dict = dict(zip(columns, row))
-    conn.commit()
-    cursor.close()
-    db.put_connection(conn)
-    
-    return Task(**task_dict)
