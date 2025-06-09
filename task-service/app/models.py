@@ -9,3 +9,7 @@ class TaskCreate(BaseModel):
 class Task(TaskCreate):
     id: int
     status: enums.StatusEnum
+
+class StatusUpdate(BaseModel):
+    new_status: enums.StatusEnum
+
