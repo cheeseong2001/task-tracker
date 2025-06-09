@@ -1,0 +1,34 @@
+services:
+  task-tracker-api:
+    build: ./task-service
+    networks: 
+      - task-network
+    ports:
+      - 80:80
+    depends_on:
+      task-tracker-db:
+        condition: service_healthy
+
+  task-tracker-db:
+    image: postgres:latest
+    networks:
+      - task-network
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_PASSWORD: task-tracker
+      POSTGRES_USER: task-tracker
+      POSTGRES_DB: task-tracker-app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "task-tracker", "-d", "task-tracker-app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  task-network:
+
+volumes:
+  pgdata:
