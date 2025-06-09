@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extensions import connection
+from contextlib import contextmanager
 
 db_pool = SimpleConnectionPool(minconn = 1, 
                                     maxconn = 3, 
@@ -9,26 +10,30 @@ db_pool = SimpleConnectionPool(minconn = 1,
                                     host = "task-tracker-db",
                                     password = "task-tracker")
 
-def get_connection() -> connection:
-    return db_pool.getconn()
-
-def put_connection(c: connection) -> None:
-    db_pool.putconn(c)
+@contextmanager
+def get_db_cursor():
+    conn: connection | None = None
+    try:
+        conn = db_pool.getconn()
+        if conn:
+            cursor = conn.cursor()
+            yield cursor
+            conn.commit()
+            cursor.close()
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 def init_db():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id SERIAL PRIMARY KEY,
-            task_name TEXT NOT NULL,
-            description TEXT NOT NULL,
-            status TEXT NOT NULL
-        );
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+    with get_db_cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                task_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+        """)
 
 def shutdown():
     db_pool.closeall()
